@@ -66,9 +66,14 @@ sudo ./install.sh
 ```
 
 The installer prepares the cage, clones ARTEX, builds and starts the containers,
-and prints a summary and the first-run setup token when available. It can prompt
-for an OpenAI-compatible model server; answering no leaves model setup for later.
-Non-interactive installs skip the prompt. Existing `.env` files are preserved.
+and prints a summary and the first-run setup token when available. When cloning
+ARTEX, it asks for the repository URL; press Enter to use the default
+`https://github.com/BaaRai/ARTEX.git`. Non-interactive installs use the default,
+and existing ARTEX checkouts are left unchanged. This also applies to `--no-up`.
+
+The installer can also prompt for an OpenAI-compatible model server; answering no
+leaves model setup for later. Non-interactive installs skip the model prompt.
+Existing `.env` files are preserved.
 
 ### Installer options
 

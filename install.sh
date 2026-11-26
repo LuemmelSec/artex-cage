@@ -297,8 +297,12 @@ fi
 
 # ------------------------------------------------------------------- ARTEX src
 if [ ! -d "$LAB_DIR/ARTEX/.git" ]; then
+  if [ -t 0 ]; then
+    read -r -p "ARTEX repository URL [$ARTEX_REPO]: " repo || die "could not read ARTEX repository"
+    ARTEX_REPO="${repo:-$ARTEX_REPO}"
+  fi
   info "cloning $ARTEX_REPO"
-  git clone --depth 1 "$ARTEX_REPO" "$LAB_DIR/ARTEX"
+  git clone --depth 1 -- "$ARTEX_REPO" "$LAB_DIR/ARTEX"
 else
   ok "ARTEX checkout already present"
 fi

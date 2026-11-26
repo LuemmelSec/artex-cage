@@ -20,6 +20,46 @@ def run_bash(script, **env):
     )
 
 
+class RepositoryTests(unittest.TestCase):
+    def clone(self, directory, answers="", interactive=True):
+        block = INSTALL.split("# ------------------------------------------------------------------- ARTEX src\n", 1)[1]
+        block = block.split("# --------------------------------------------------------------------- .env", 1)[0]
+        block = block.replace("[ -t 0 ]", "true" if interactive else "false")
+        block = block.replace("read -r -p", "read -r -u 3 -p")
+        harness = r'''
+set -euo pipefail
+LAB_DIR="$TEST_TMP"
+ARTEX_REPO="https://github.com/BaaRai/ARTEX.git"
+exec 3<<<"$ANSWERS"
+info() { :; }
+ok() { echo "$*"; }
+die() { echo "$*" >&2; exit 1; }
+git() { printf 'git'; printf ' <%s>' "$@"; printf '\n'; }
+'''
+        return run_bash(harness + block, TEST_TMP=directory, ANSWERS=answers)
+
+    def test_selected_repository_and_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for answer, interactive, expected in (
+                ("https://example.com/custom.git", True, "https://example.com/custom.git"),
+                ("", True, "https://github.com/BaaRai/ARTEX.git"),
+                ("https://example.com/ignored.git", False, "https://github.com/BaaRai/ARTEX.git"),
+            ):
+                with self.subTest(answer=answer, interactive=interactive):
+                    result = self.clone(tmp, answer, interactive)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(f"git <clone> <--depth> <1> <--> <{expected}>", result.stdout)
+
+    def test_existing_checkout_is_not_replaced(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "ARTEX" / ".git").mkdir(parents=True)
+            result = self.clone(tmp, "https://example.com/custom.git")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("ARTEX checkout already present", result.stdout)
+            self.assertNotIn("git <clone>", result.stdout)
+            self.assertNotIn("ARTEX repository URL", result.stderr)
+
+
 class EndpointTests(unittest.TestCase):
     def endpoint(self, value):
         function = INSTALL.split("normalize_model_endpoint() {", 1)[1].split("\nMODE=", 1)[0]
