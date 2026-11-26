@@ -1,0 +1,19 @@
+{
+  "listen": "127.0.0.1",
+  "port": 9099,
+
+  "sources": ["172.30.10.0/24"],
+  "bridges": ["artex0"],
+
+  "lab_subnets": ["172.30.20.0/24"],
+  "lab_bridges": ["lab0"],
+
+  "killswitch_pause": true,
+
+  "auto_allow": [],
+
+  "token_file": "/etc/artex-lab/ui-token",
+  "state_file": "/var/lib/artex-egress/state.json",
+  "events_file": "/var/lib/artex-egress/events.jsonl",
+  "table": "artex_egress"
+}

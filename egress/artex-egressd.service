@@ -1,0 +1,33 @@
+[Unit]
+Description=ARTEX egress control (nftables cage + traffic console)
+Documentation=file:/opt/artex-egress/egressd.py
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/artex-egress/egressd.py --config /etc/artex-lab/egress.json
+Restart=always
+RestartSec=3
+TimeoutStopSec=10s
+
+# The daemon needs CAP_NET_ADMIN to rewrite the nftables table and nothing else.
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_DAC_READ_SEARCH
+AmbientCapabilities=
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=full
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+ReadWritePaths=/var/lib/artex-egress /run/log
+
+[Install]
+WantedBy=multi-user.target

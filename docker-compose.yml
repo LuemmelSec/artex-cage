@@ -1,0 +1,159 @@
+# ARTEX in a cage.
+#
+#   egress network (172.30.10.0/24, bridge "artex0")
+#       postgres, artex  ->  the only way out. Every packet is dropped unless
+#                            the operator approved that destination in the
+#                            egress console (http://127.0.0.1:9099).
+#   lab network    (172.30.20.0/24, bridge "lab0", internal)
+#       artex + whatever deliberately vulnerable targets you add. No gateway,
+#       so a target can never reach the internet or the model server.
+#
+# artex talks to both, so it can attack the lab without any approval, and needs
+# one click per internet destination.
+
+name: artex-lab
+
+networks:
+  egress:
+    name: artex-lab-egress
+    driver: bridge
+    enable_ipv6: false
+    driver_opts:
+      com.docker.network.bridge.name: artex0
+    ipam:
+      config:
+        - subnet: 172.30.10.0/24
+  lab:
+    name: artex-lab-lab
+    driver: bridge
+    enable_ipv6: false
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.name: lab0
+    ipam:
+      config:
+        - subnet: 172.30.20.0/24
+
+volumes:
+  pgdata:
+
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:f2f98726820d0342055351c6e9d36e705f5bfffb3dd53ff556325114b08afb6d
+    dns: [1.1.1.1]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-artex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-artex}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [egress]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-artex} -d ${POSTGRES_DB:-artex}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+    mem_limit: 2g
+    pids_limit: 512
+
+  artex:
+    build:
+      context: ./ARTEX
+      args:
+        ARTEX_VERSION: ${ARTEX_VERSION:-dev}
+    image: artex:local
+    # Explicit upstream: Docker forwards DNS from the container namespace,
+    # where the cage and kill switch apply. Approval is still required.
+    dns: [1.1.1.1]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    init: true
+    networks:
+      egress:
+        gw_priority: 1
+      lab:
+        gw_priority: 2
+
+    # Loopback only: open the UI from the VM's own desktop browser. The egress
+    # console is on 127.0.0.1:9099. Neither port is reachable from a container.
+    ports:
+      - "127.0.0.1:8787:8787"
+      - "127.0.0.1:8788:8788"
+
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+
+      # --- database ---------------------------------------------------- #
+      ARTEX_PG_HOST: postgres
+      ARTEX_PG_PORT: "5432"
+      ARTEX_PG_USER: ${POSTGRES_USER:-artex}
+      ARTEX_PG_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in .env}
+      ARTEX_PG_DBNAME: ${POSTGRES_DB:-artex}
+      ARTEX_PG_SSLMODE: disable
+
+      # --- model ------------------------------------------------------- #
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ARTEX_LLM_PROVIDER: ${ARTEX_LLM_PROVIDER:-}
+      ARTEX_LLM_MODEL: ${ARTEX_LLM_MODEL:-}
+      ARTEX_LLM_BASE_URL: ${ARTEX_LLM_BASE_URL:-}
+      ARTEX_LLM_PRIVATE_ENDPOINTS: ${ARTEX_LLM_PRIVATE_ENDPOINTS:-}
+
+      # --- keys -------------------------------------------------------- #
+      ARTEX_JWT_KEY_DIR: /app/keys
+      ARTEX_SECRET_KEY: ${ARTEX_SECRET_KEY:-}
+
+      # --- safety rails ------------------------------------------------ #
+      # Frames every tool result as untrusted data (prompt-injection boundary).
+      ARTEX_UNTRUSTED_BOUNDARY: ${ARTEX_UNTRUSTED_BOUNDARY:-}
+      # No phone-home: the update check is the one request that would leave the
+      # cage on its own, and it is pointless with a deny-by-default firewall.
+      ARTEX_UPDATE_CHECK: "0"
+      ARTEX_NOISE_PROFILE: ${ARTEX_NOISE_PROFILE:-}
+      ARTEX_TARGET_USER_AGENT: ${ARTEX_TARGET_USER_AGENT:-}
+      ARTEX_TASK_BUDGET_TOKENS: ${ARTEX_TASK_BUDGET_TOKENS:-}
+      ARTEX_TASK_BUDGET_TURNS: ${ARTEX_TASK_BUDGET_TURNS:-}
+      ARTEX_INTENT_BUDGET_TOKENS: ${ARTEX_INTENT_BUDGET_TOKENS:-}
+      ARTEX_INTENT_BUDGET_TURNS: ${ARTEX_INTENT_BUDGET_TURNS:-}
+
+    volumes:
+      - ./data:/app/data
+      - ./keys:/app/keys
+
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    # NET_RAW: nmap/ping from the server process. The rest keeps a root
+    # entrypoint able to chown its data dir and drop to the executor uid.
+    cap_add: [NET_RAW, CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+    pids_limit: 8192
+    mem_limit: 6g
+    cpus: "4"
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+
+  # --- deliberately vulnerable lab targets ---------------------------------- #
+  # Lab network only: no gateway, so a target can never call out and can never
+  # reach the model server. ARTEX reaches it without an approval click.
+  #
+  # juice-shop:
+  #   image: bkimminich/juice-shop
+  #   networks: [lab]
+  #   cap_drop: [ALL]
+  #   pids_limit: 512
+  #   mem_limit: 1g
+  #   restart: unless-stopped

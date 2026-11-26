@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARTEX Egress</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="dot" id="statusDot"></span>
+    <h1>ARTEX <span>egress</span></h1>
+  </div>
+  <div class="meta" id="meta"></div>
+  <div class="actions">
+    <button class="btn danger" id="killBtn" title="Drop every packet to or from the ARTEX and lab networks, including established connections, and freeze the cage containers">Kill switch</button>
+  </div>
+</header>
+
+<div class="banner" id="errorBanner" hidden></div>
+
+<main>
+  <section class="panel">
+    <header>
+      <h2>Pending approvals</h2>
+      <span class="badge" id="pendingCount">0</span>
+    </header>
+    <div class="list" id="pendingList"></div>
+  </section>
+
+  <section class="panel">
+    <header>
+      <h2>Live connections</h2>
+      <span class="badge" id="connCount">0</span>
+      <label class="search"><input id="connFilter" placeholder="filter…" autocomplete="off"></label>
+    </header>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Destination</th><th>Proto</th><th>State</th>
+            <th class="num">Bytes</th><th class="num">Pkts</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="connBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <header>
+      <h2>Rules</h2>
+      <span class="badge" id="ruleCount">0</span>
+      <button class="btn ghost small" id="addRuleBtn">+ Add</button>
+    </header>
+    <div class="list" id="rulesList"></div>
+  </section>
+</main>
+
+<section class="panel" id="logPanel">
+  <header>
+    <h2>Event log</h2>
+    <button class="btn ghost small" id="downloadBtn">Export</button>
+  </header>
+  <div class="log" id="logList"></div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<dialog id="addDialog">
+  <form method="dialog" id="addForm">
+    <h3>New rule</h3>
+    <div class="field">
+      <label for="fDst">Destination IP</label>
+      <input id="fDst" required placeholder="10.232.85.254" pattern="[0-9.]+">
+    </div>
+    <div class="field">
+      <label for="fPort">Port</label>
+      <input id="fPort" required type="number" min="1" max="65535" placeholder="1234">
+    </div>
+    <div class="field">
+      <label for="fProto">Protocol</label>
+      <select id="fProto">
+        <option value="tcp">tcp</option>
+        <option value="udp">udp</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="fAction">Action</label>
+      <select id="fAction">
+        <option value="allow">allow</option>
+        <option value="block">block</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="fNote">Note</label>
+      <input id="fNote" placeholder="why this destination">
+    </div>
+    <div class="dialog-actions">
+      <button class="btn ghost" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn ok" value="save" id="addSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
