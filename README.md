@@ -226,6 +226,7 @@ its firewall tables in place. After updating this project, run
 - Firewall rules are not retained across host reboot, and Docker may start
   containers before the daemon reapplies them. A daemon restart on a running
   host is different: the existing nftables tables remain loaded.
+- The tool could still try to abuse your LLM.
 - Protect and back up `keys/`, which contains ARTEX's key material. ARTEX's own
   scope, interception and budget controls are additional safeguards, not
   substitutes for network isolation.
